@@ -1,5 +1,7 @@
 import os
 import logging
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
@@ -14,6 +16,19 @@ from telegram.ext import (
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+
+# Servidor Dummy para mantener Render contento en el plan gratuito
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Bot activo")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    server.serve_forever()
 
 # Estados de la conversación
 EDAD, PESO_ESTATURA, SALUD, OBJETIVO, EXPERIENCIA, LUGAR = range(6)
@@ -108,6 +123,9 @@ def main():
     if not token:
         raise ValueError("No se encontró el token de Telegram. Configúralo en las variables de entorno.")
 
+    # Iniciar servidor HTTP en segundo plano para Render
+    Thread(target=run_dummy_server, daemon=True).start()
+
     application = Application.builder().token(token).build()
 
     conv_handler = ConversationHandler(
@@ -129,4 +147,4 @@ def main():
     application.run_polling()
 
 if _name_ == "_main_":
-    main(
+    main()
