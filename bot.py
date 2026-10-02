@@ -1,32 +1,4 @@
-[23:51, 1/10/2026] rolandrodri1: import os
-import logging
-from threading import Thread
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ConversationHandler,
-    filters,
-    ContextTypes,
-)
-
-# Configuración de logs
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-
-# Servidor Dummy para mantener Render contento en el plan gratuito
-class DummyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"Bot activo")
-
-def run_dummy_server…
-[23:56, 1/10/2026] rolandrodri1: import os
+import os
 import logging
 from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -175,4 +147,4 @@ def main():
     application.run_polling()
 
 if __name__ == "__main__":
-    main(
+    main()
