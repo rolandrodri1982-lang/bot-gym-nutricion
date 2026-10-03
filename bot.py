@@ -26,35 +26,6 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"OK")
 
-    def log_message(self…
-import os
-import logging
-import asyncio
-from threading import Thread
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ConversationHandler,
-    filters,
-    ContextTypes,
-)
-
-# Configuración de logs
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-
-# Servidor HTTP para cumplir el requerimiento de Render
-class DummyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"OK")
-
     def log_message(self, format, *args):
         return
 
