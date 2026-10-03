@@ -26,6 +26,35 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"OK")
 
+    def log_message(self…
+import os
+import logging
+import asyncio
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ConversationHandler,
+    filters,
+    ContextTypes,
+)
+
+# Configuración de logs
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
+# Servidor HTTP para cumplir el requerimiento de Render
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"OK")
+
     def log_message(self, format, *args):
         return
 
@@ -34,12 +63,15 @@ def run_dummy_server():
     server = HTTPServer(("0.0.0.0", port), DummyHandler)
     server.serve_forever()
 
-# Estados de la conversación
+# Estados de la conversación principal
 EDAD, PESO_ESTATURA, SALUD, OBJETIVO, EXPERIENCIA, LUGAR = range(6)
+
+# Estado de la revisión de progreso
+NUEVO_PESO = 0
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
-        "¡Hola! Bienvenido a tu entrenador personal y guía nutricional IA. 🏋️‍♂️🥗\n\n"
+        "¡Hola! Bienvenido a tu entrenador personal y guía nutricional IA. 🏋️‍♂️️🥗\n\n"
         "Para diseñarte el plan perfecto, necesito hacerte 6 breves preguntas.\n\n"
         "1️⃣ ¿Cuál es tu edad?"
     )
@@ -112,7 +144,7 @@ async def recibir_lugar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     salud = context.user_data.get("salud", "Ninguno")
     objetivo = context.user_data.get("objetivo", "Salud General")
     experiencia = context.user_data.get("experiencia", "Principiante")
-    lugar = context.user_data.get("lugar", "En casa")
+    lugar = context.user_data.get("lugar", "Gimnasio")
 
     resumen = (
         "✅ *¡Cuestionario completado!*\n\n"
@@ -129,28 +161,101 @@ async def recibir_lugar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         resumen, reply_markup=ReplyKeyboardRemove(), parse_mode="Markdown"
     )
 
-    # Generación del Plan Entrenador / Nutrición
+    # Detalle de rutina adaptada según Gimnasio vs En Casa
+    if "casa" in lugar.lower():
+        rutina_detalle = (
+            "🏋️ *RUTINA SEMANAL DETALLADA (EN CASA / CALISTENIA):*\n\n"
+            "📌 *Día 1: Empuje (Pecho, Hombro, Tríceps)*\n"
+            "• Flexiones de pecho (Push-ups): 4 series de 10-12 reps.\n"
+            "• Flexiones declinadas o en pica (Hombros): 3 series de 8-10 reps.\n"
+            "• Elevaciones laterales (con botellas/mancuernas): 3 series de 12-15 reps.\n"
+            "• Fondos en silla o banco (Tríceps): 3 series de 10-12 reps.\n\n"
+            "📌 *Día 2: Tirón (Espalda, Bíceps, Abdomen)*\n"
+            "• Dominadas o Remo con mochila/mancuerna: 4 series de 8-10 reps.\n"
+            "• Curl de bíceps con mancuernas/mochila: 3 series de 12 reps.\n"
+            "• Plancha abdominal: 3 series sostenidas de 45 segundos.\n"
+            "• Crunches/Elevación de piernas: 3 series de 15 reps.\n\n"
+            "📌 *Día 3: Pierna (Inferior)*\n"
+            "• Sentadillas con peso corporal o mochila: 4 series de 15 reps.\n"
+            "• Zancadas/Lunges alternados: 3 series de 12 reps por pierna.\n"
+            "• Puentes de glúteo/isquios: 3 series de 15 reps.\n"
+            "• Elevación de talones (Pantorrillas): 4 series de 20 reps.\n\n"
+            "📌 *Día 4: Cardio & Movilidad*\n"
+            "• Burpees o saltos de tijera: 4 rondas de 45 seg trabajo / 15 seg descanso.\n"
+            "• Estiramientos completos: 15 minutos.\n\n"
+            "📌 *Día 5: Full Body / Repaso general*\n"
+            "• Circuito combinado de 3 rondas con ejercicios de días anteriores."
+        )
+    else:
+        rutina_detalle = (
+            "🏋️ *RUTINA SEMANAL DETALLADA (GIMNASIO):*\n\n"
+            "📌 *Día 1: Empuje (Pecho, Hombro y Tríceps)*\n"
+            "• Press de banca plano con barra o mancuernas: 4 series de 8-10 reps.\n"
+            "• Press inclinado con mancuernas (Pecho superior): 3 series de 10-12 reps.\n"
+            "• Press Militar con barra/mancuernas (Hombros): 3 series de 10 reps.\n"
+            "• Elevaciones laterales con mancuernas (Hombros): 4 series de 12-15 reps.\n"
+            "• Extensión de tríceps en polea alta: 3 series de 12 reps.\n\n"
+            "📌 *Día 2: Tirón (Espalda, Bíceps y Abdomen)*\n"
+            "• Jalón al pecho en polea alta (Espalda alta): 4 series de 10 reps.\n"
+            "• Remo con barra o en máquina: 3 series de 10-12 reps.\n"
+            "• Curl de bíceps con barra Z o mancuernas: 3 series de 12 reps.\n"
+            "• Curl martillo para antebrazo/bíceps: 3 series de 12 reps.\n"
+            "• Elevación de piernas colgado o en banco (Abdomen): 3 series de 15 reps.\n\n"
+            "📌 *Día 3: Pierna Completa*\n"
+            "• Sentadilla libre o en máquina Smith: 4 series de 8-10 reps.\n"
+            "• Prensa de piernas: 3 series de 10-12 reps.\n"
+            "• Curl femoral acostado o sentado (Isquios): 3 series de 12 reps.\n"
+            "• Elevación de pantorrillas de pie: 4 series de 15-20 reps.\n\n"
+            "📌 *Día 4: Cardio Activo & Abdomen*\n"
+            "• Caminadora inclorada o Elíptica: 30 minutos a ritmo constante.\n"
+            "• Rutina de abdominales en polea/colchoneta: 15 minutos.\n\n"
+            "📌 *Día 5: Enfoque Hombros & Brazos / Torso*\n"
+            "• Press inclinado + Elevaciones laterales con mancuernas.\n"
+            "• Super-serie Bíceps y Tríceps: 3 series de 12 reps."
+        )
+
     plan_texto = (
-        "💪 *TU PLAN PERSONALIZADO DE ENTRENAMIENTO Y NUTRICIÓN*\n\n"
-        "🏋️ *Rutina Semanal Recomendada:*\n"
-        "• *Día 1 (Empuje):* Pecho, Hombros y Tríceps (3 series de 10-12 reps).\n"
-        "• *Día 2 (Tirón):* Espalda, Bíceps y Abdomen (3 series de 10-12 reps).\n"
-        "• *Día 3 (Pierna):* Cuádriceps, Isquiotibiales y Pantorrillas.\n"
-        "• *Día 4:* Cardio moderado (30 min) + Movilidad / Estiramientos.\n"
-        "• *Día 5:* Rutina Full-Body o enfoque según preferencia.\n\n"
-        "🥗 *Pautas de Nutrición Básicas:*\n"
-        "• Prioriza proteína magra (pollo, pescado, huevos, tofu) en cada comida.\n"
-        "• Mantén una buena hidratación (2.5 a 3 litros de agua al día).\n"
-        "• Consume carbohidratos complejos (avena, arroz integral, camote) alrededor de tus entrenamientos.\n\n"
-        "🔄 Envía /start en cualquier momento si deseas rehacer el cuestionario."
+        f"{rutina_detalle}\n\n"
+        "🥗 *PAUTAS DE NUTRICIÓN RECOMENDADAS:*\n"
+        "• Proteínas: Pollo, carne magra, pescado, huevos o lomo.\n"
+        "• Carbohidratos: Avena, arroz integral, camote, papa o yuca (especialmente post-entrenamiento).\n"
+        "• Grasas saludables: Aguacate, frutos secos, aceite de oliva.\n"
+        "• Agua: Beber entre 2.5 y 3.5 litros diarios.\n\n"
+        "📅 *SEGUIMIENTO Y CONTROL DE PROGRESO:*\n"
+        "Para garantizar resultados y cambiar tu rutina a tiempo:\n"
+        "1. Te recomendamos realizar un chequeo de control *cada 15 o 30 días*.\n"
+        "2. Envía el comando */revision* para registrar tu nuevo peso y evaluar la evolución de tu plan.\n\n"
+        "🔄 Envía /start en cualquier momento si deseas rehacer el cuestionario completo."
     )
 
     await update.message.reply_text(plan_texto, parse_mode="Markdown")
     return ConversationHandler.END
 
+# Función de Revisión de Progreso Quincenal/Mensual
+async def iniciar_revision(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text(
+        "📊 *CONTROL Y REVISIÓN DE PROGRESO* 📊\n\n"
+        "¡Excelente compromiso! Llevar un registro periódico permite ajustar tus cargas o cambiar tu rutina.\n\n"
+        "¿Cuál es tu peso actual en kg? (Ejemplo: 82)"
+    )
+    return NUEVO_PESO
+
+async def guardar_nuevo_peso(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    nuevo_peso = update.message.text
+    await update.message.reply_text(
+        f"✅ ¡Registro guardado con éxito! Tu peso actual registrado es *{nuevo_peso} kg*.\n\n"
+        "💪 *Recomendación de tu entrenador IA:*\n"
+        "• Si tu objetivo es *perder peso* y has reducido medidas, mantén las cargas e intensifica el cardio.\n"
+        "• Si tu objetivo es *ganar masa muscular*, intenta subir gradualmente el peso en ejercicios clave (como Press Militar o Sentadilla).\n"
+        "• Recuerda realizar este chequeo nuevamente en *15 días*.\n\n"
+        "Si deseas cambiar completamente de rutina, puedes enviar /start.",
+        parse_mode="Markdown"
+    )
+    return ConversationHandler.END
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
-        "Proceso cancelado. Envía /start cuando quieras volver a empezar.",
+        "Proceso cancelado. Envía /start cuando quieras reiniciar.",
         reply_markup=ReplyKeyboardRemove(),
     )
     return ConversationHandler.END
@@ -168,6 +273,7 @@ def main():
 
     application = Application.builder().token(token).build()
 
+    # Manejador del Cuestionario Inicial
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -187,7 +293,17 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
+    # Manejador de la Revisión de Progreso Quincenal/Mensual
+    revision_handler = ConversationHandler(
+        entry_points=[CommandHandler("revision", iniciar_revision)],
+        states={
+            NUEVO_PESO: [MessageHandler(filters.TEXT & ~filters.COMMAND, guardar_nuevo_peso)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
     application.add_handler(conv_handler)
+    application.add_handler(revision_handler)
 
     print("Bot en marcha...")
     application.run_polling()
